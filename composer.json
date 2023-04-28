@@ -16,6 +16,7 @@
     "scripts": {
         "serve": "php -S 0.0.0.0:8080 -t public",
         "lint-fix": "composer exec phpcbf -v",
+        "lint": "composer exec phpcs -v",
         "test": "phpunit --colors=always"
     },
     "require-dev": {

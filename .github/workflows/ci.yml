@@ -1,0 +1,30 @@
+name: ci
+
+on:
+    push:
+        branches: [main]
+        tags:
+            - '**'
+
+jobs:
+    app-build:
+        name: Install ubuntu
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup PHP with Xdebug 2.x
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.1'
+                  coverage: xdebug2
+
+            - name: Setup project
+              run: make setup-ci
+
+            - name: Setup project
+              run: make lint
+
+
+
