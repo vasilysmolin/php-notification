@@ -20,6 +20,9 @@ jobs:
                   php-version: '8.1'
                   coverage: xdebug2
 
+            - name: env
+              run: cp -n .env.example .env || true
+
             - name: Setup project
               run: make setup-ci
 
