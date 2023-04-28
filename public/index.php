@@ -1,6 +1,6 @@
 <?php
 
-use App\Notification\Notificaion;
+use App\Notifications\Notification;
 use Framework\Connection;
 
 chdir(dirname(__DIR__));
@@ -16,12 +16,12 @@ $path = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($path === '/users' && $method === 'GET') {
-    $users = $conn->query('select * from users')->fetchAll(PDO::FETCH_ASSOC);
+    $users = $conn->query('select * from users')->fetchAll();
     echo json_encode($users);
 } elseif (preg_match('#^/users/(?P<id>\d+)$#i', $path, $matches)  && $method === 'GET') {
     $query = $conn->prepare("SELECT * FROM users WHERE `id` = ?");
     $query->execute([$matches['id']]);
-    $user = $query->fetch(PDO::FETCH_ASSOC);
+    $user = $query->fetch();
     echo json_encode($user);
 
 } elseif ($path === '/users'  && $method === 'POST') {
@@ -45,21 +45,28 @@ if ($path === '/users' && $method === 'GET') {
 
     $query = $conn->prepare("SELECT * FROM user_settings WHERE `user_id` = ?");
     $query->execute([$matches['id']]);
-    $setting = $query->fetch(PDO::FETCH_ASSOC);
+    $setting = $query->fetch();
     echo json_encode($setting);
 
 } elseif (preg_match('#^/settings/(?P<id>\d+)$#i', $path, $matches) && $method === 'PUT') {
     $json = json_decode(file_get_contents('php://input'), true);
     $query = $conn->prepare("SELECT * FROM users WHERE `email` = ?");
     $query->execute([$json['email']]);
-    $user = $query->fetch(PDO::FETCH_ASSOC);
+    $user = $query->fetch();
     $code = base64_encode($json['code']);
-    $query = $conn->prepare("SELECT * FROM user_code WHERE `code` = ? and `user_id` = ? ORDER BY id DESC ");
+    $query = $conn->prepare("SELECT * FROM user_code WHERE `code` = ? AND `user_id` = ? ORDER BY id DESC");
     $query->execute([$code, $user['id']]);
-    $checkCode = $query->fetch(PDO::FETCH_ASSOC);
+    $checkCode = $query->fetch();
     if (empty($checkCode)) {
         http_response_code(422);
-        echo json_encode([]);
+        echo json_encode(['error' => 'Неверный код подтверждения']);
+        return;
+    }
+    $newTime = strtotime('-3 minutes');
+    if ($checkCode['created_at'] < date("Y-m-d H:i:s", $newTime)) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Истекло время кода подтверждения']);
+        return;
     }
     $query = "UPDATE `user_settings` SET `confirmation` = :confirmation WHERE `id` = :id";
     $params = [
@@ -69,21 +76,29 @@ if ($path === '/users' && $method === 'GET') {
     $query = $conn->prepare($query);
     $query->execute($params);
     http_response_code(204);
-    echo json_encode([$checkCode]);
+    echo json_encode([]);
 
 } elseif (preg_match('#^/send-code/(?P<id>\d+)$#i', $path, $matches)  && $method === 'POST') {
     $json = json_decode(file_get_contents('php://input'), true);
     $query = $conn->prepare("SELECT * FROM users WHERE `email` = ?");
     $query->execute([$json['email']]);
-    $user = $query->fetch(PDO::FETCH_ASSOC);
+    $user = $query->fetch();
 
+    $query = $conn->prepare("SELECT COUNT(*) as count FROM user_code WHERE date(`created_at`) = ? and `user_id` = ? ORDER BY id DESC ");
+    $query->execute([date("Y-m-d"), $user['id']]);
+    $setting = $query->fetch();
+    if ($setting['count'] > 3) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Превышен лимит подтверждений']);
+        return;
+    }
     $query = $conn->prepare("SELECT * FROM user_settings WHERE `user_id` = ?");
     $query->execute([$user['id']]);
-    $setting = $query->fetch(PDO::FETCH_ASSOC);
+    $setting = $query->fetch();
 
     $rand = rand(1111,9999);
     $code = base64_encode($rand);
-    Notificaion::send($setting['confirmation'], $rand);
+    Notification::send($setting['confirmation'], $rand);
 
     $query = "INSERT INTO user_code (user_id, code, created_at, updated_at) VALUES (:user_id, :code, :created_at, :updated_at)";
     $params = [

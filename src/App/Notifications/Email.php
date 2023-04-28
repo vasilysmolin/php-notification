@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notification;
+namespace App\Notifications;
 
 class Email implements NotificationInterface {
 

@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Notification;
+namespace App\Notifications;
 
-class Notificaion {
+class Notification {
 
     public static function send(string $type, int $code)
     {
