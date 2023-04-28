@@ -1,6 +1,15 @@
 # php code settings
 
-Слои
+## Установка
+- composer install
+
+## Запуск сервера на php
+- composer serve
+
+## Линтер
+- composer lint
+
+# Слои
 1. Хранилище
 - база данных
 2. Бизнес логика
