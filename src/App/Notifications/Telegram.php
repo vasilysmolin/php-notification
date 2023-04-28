@@ -2,10 +2,9 @@
 
 namespace App\Notifications;
 
-class Telegram implements NotificationInterface {
-
+class Telegram implements NotificationInterface
+{
     public static function send(int $code): void
     {
-
     }
 }

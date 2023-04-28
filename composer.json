@@ -15,6 +15,10 @@
     },
     "scripts": {
         "serve": "php -S 0.0.0.0:8080 -t public",
+        "lint-fix": "composer exec phpcbf -v",
         "test": "phpunit --colors=always"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.7"
     }
 }

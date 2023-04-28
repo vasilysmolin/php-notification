@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-interface NotificationInterface {
-
+interface NotificationInterface
+{
     public static function send(int $code): void;
 }

@@ -2,8 +2,8 @@
 
 namespace App\Notifications;
 
-class Notification {
-
+class Notification
+{
     public static function send(string $type, int $code)
     {
         switch ($type) {

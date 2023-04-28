@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<ruleset name="Php-code" namespace="\">
+    <file>./src</file>
+    <file>./public</file>
+    <description>coding standard</description>
+    <exclude-pattern>_ide_*</exclude-pattern>
+
+    <arg name="extensions" value="php,inc" />
+    <arg name="colors"/>
+    <arg value="sp"/>
+    <ini name="memory_limit" value="1012M"/>
+    <rule ref="PSR12">
+        <exclude name="PSR12.Properties.ConstantVisibility"/>
+    </rule>
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="500"/>
+            <property name="absoluteLineLimit" value="500"/>
+        </properties>
+    </rule>
+
+</ruleset>
