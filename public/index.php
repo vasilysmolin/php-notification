@@ -2,6 +2,7 @@
 
 use App\Notifications\Notification;
 use Framework\Connection;
+use Framework\Jwt;
 
 chdir(dirname(__DIR__));
 require 'vendor/autoload.php';
@@ -11,11 +12,15 @@ try {
 } catch (PDOException $e) {
     echo 'Connection failed: ' . $e->getMessage();
 }
+$jwt = new Jwt($_SERVER['HTTP_AUTHORIZATION']);
 header('Content-Type: application/json');
 $path = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($path === '/users' && $method === 'GET') {
+    if ($jwt->verifyToken()) {
+        $jwt->getUser();
+    }
     $users = $conn->query('select * from users')->fetchAll();
     echo json_encode($users);
 } elseif (preg_match('#^/users/(?P<id>\d+)$#i', $path, $matches)  && $method === 'GET') {
