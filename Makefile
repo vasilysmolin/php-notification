@@ -10,3 +10,9 @@ install:
 
 lint:
 	composer lint
+
+build-php:
+	docker build -t kitman/php-native:$(branch) -f ./images/php/Dockerfile .
+	docker push kitman/php-native:$(branch)
+	docker build -t kitman/nginx-native:$(branch) -f ./images/nginx/Dockerfile .
+	docker push kitman/nginx-native:$(branch)
