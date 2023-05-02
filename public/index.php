@@ -93,7 +93,7 @@ if ($path === '/users' && $method === 'GET') {
 
     $rand = rand(1111, 9999);
     $code = base64_encode($rand);
-    Notification::send($setting['confirmation'], $rand);
+    Notification::send($user, $setting['confirmation'], $rand);
 
     $query = "INSERT INTO user_code (user_id, code, created_at, updated_at) VALUES (:user_id, :code, :created_at, :updated_at)";
     $params = [
