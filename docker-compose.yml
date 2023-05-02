@@ -19,17 +19,17 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
 
   php-nginx:
-      image: kitman/php-native:main
+      image: kitman/nginx-native:main
       restart: always
       volumes:
           - .:/var/www/php
       ports:
           - "127.0.0.1:3079:80"
       links:
-          - "php-fpm:php-fpm"
+          - "php-native-fpm:php-fpm"
 
-  php-fpm:
-      image: kitman/nginx-native:main
+  php-native-fpm:
+      image: kitman/php-native:main
       env_file: .env
       restart: always
       volumes:
