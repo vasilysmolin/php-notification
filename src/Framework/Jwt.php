@@ -9,14 +9,17 @@ class Jwt
 {
     private $token = null;
 
-    public function __construct(string $bearer)
+    public function __construct(?string $bearer)
     {
         $dotenv = Dotenv::createImmutable(__DIR__ . '/../..');
         $dotenv->load();
-        $token = explode('Bearer ', $bearer);
-        if (isset($token[1])) {
-            $this->token = $token[1];
+        if ($bearer) {
+            $token = explode('Bearer ', $bearer);
+            if (isset($token[1])) {
+                $this->token = $token[1];
+            }
         }
+
     }
 
 //    function createToken($userId, $secret) {
@@ -38,10 +41,15 @@ class Jwt
         list($header, $payload, $signature) = explode('.', $this->token);
         $valid = hash_hmac('sha256', "$header.$payload", $_ENV['JWT_SECRET'], true);
         $valid = base64_encode($valid);
+//        echo $signature;
+//        echo PHP_EOL;
+//        echo substr($valid,0,-1);
+        $valid = str_replace('/', '_', $valid);
+        $valid = str_replace('+', '-', $valid);
         return $signature === substr($valid,0,-1);
     }
 
-    public function getUser(): int {
+    public function getUserID(): int {
 
         list($header, $payload, $signature) = explode('.', $this->token);
         $payload = json_decode(base64_decode($payload), true);
