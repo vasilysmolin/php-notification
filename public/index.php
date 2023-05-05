@@ -82,7 +82,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
 
 
     if ($view === 'unit') {
-        if (empty($isPermission)) {
+        if (count($isPermission) < 2) {
             $userID = $currentUserID;
         }
         $userSql = $userID ?  "`users`.`userID` = ? and"  : '';
