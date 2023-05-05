@@ -19,3 +19,8 @@ build-php:
 	docker push kitman/php-native:$(branch)
 	docker build -t kitman/nginx-native:$(branch) -f ./images/nginx/Dockerfile .
 	docker push kitman/nginx-native:$(branch)
+
+app-php:
+	docker-compose pull php-native-fpm && docker-compose up -d php-native-fpm
+	docker-compose pull php-nginx && docker-compose up -d php-nginx
+

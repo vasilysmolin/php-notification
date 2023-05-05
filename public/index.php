@@ -25,7 +25,7 @@ $uri = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 list($path, $params) = explode('?', $uri);
 
-if ($path === '/api/crm/calendar-php' && $method === 'GET') {
+if ($path === '/api/crm/calendar' && $method === 'GET') {
     if (!$jwt->verifyToken()) {
         echo json_encode(['errors' =>
             [
@@ -267,9 +267,15 @@ if ($path === '/api/crm/calendar-php' && $method === 'GET') {
 
             $blockingTimes = $blockingTimes->map(function ($block) use ($masters, $colors) {
                 $block['onlineIsBlocked'] = (bool) $block['onlineIsBlocked'];
+                unset($block['created_at']);
+                unset($block['pivot_userID']);
+                unset($block['pivot_blockTimeID']);
+                unset($block['updated_at']);
                 $color = collect($colors)->where('colorID', $block['colorID'])->first() ?? null;
+                unset($block['colorID']);
                 $block['color'] = $color['color'];
                 $users = collect($masters)->where('userID', $block['userID'])->map(function ($user) {
+                    unset($user['phone']);
                     if (!empty($user['avatar'])) {
                         list($name, $extention) = explode('.', $user['avatar']);
                         $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
@@ -282,7 +288,7 @@ if ($path === '/api/crm/calendar-php' && $method === 'GET') {
                     $block['timeTo'] >= '23:45:00';
 
                 return $block;
-            });
+            })->values();
 
 
             $employee['blockingTime'] = $blockingTimes;
@@ -294,6 +300,10 @@ if ($path === '/api/crm/calendar-php' && $method === 'GET') {
                 if ($bid['timeTo']) {
                     $bid['timeTo'] = substr($bid['timeTo'], 0, 5);
                 }
+                unset($bid['dateTime']);
+                unset($bid['created_at']);
+                unset($bid['updated_at']);
+                unset($bid['deleted_at']);
                 $bid['timeDuration'] = (int) $bid['timeDuration'];
                 $service = collect($services)->where('serviceID', $bid['serviceID'])->first() ?? null;
                 $bid['serviceName'] = $service['customTitle'] ?? $service['title'];
@@ -308,7 +318,12 @@ if ($path === '/api/crm/calendar-php' && $method === 'GET') {
                 return in_array($visit['visitID'], $masterBids->keys()->toArray());
             })->map(function ($visit) use ($masterBids, $clients, $notificationRepeatReminder, $notificationReminder) {
                 $bids = $masterBids[$visit['visitID']];
+                unset($visit['adminID']);
+                unset($visit['created_at']);
+                unset($visit['updated_at']);
+                unset($visit['deleted_at']);
                 $client = collect($clients)->where('clientID', $visit['clientID'])->first() ?? null;
+                unset($visit['clientID']);
                 $visit['client'] = $client;
                 $visit['isOnline'] = (bool) $visit['isOnline'];
                 $visit['timeStart'] = $bids->first()['timeFrom'];
@@ -322,7 +337,18 @@ if ($path === '/api/crm/calendar-php' && $method === 'GET') {
                 return $visit;
             })->values();
             return $employee;
-        });
+        })->filter(function($user) {
+            if (count($user['visits']) > 0 ) {
+                return true;
+            }
+            if (count($user['schedules']) > 0) {
+                return true;
+            }
+            if (count($user['blockingTime']) > 0) {
+                return true;
+            }
+            return false;
+        })->values();
     }
 
     $start = !empty($bids) ? substr(collect($bids)->first()['timeFrom'], 0, 5) : '9:00';
