@@ -337,7 +337,10 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
                 return $visit;
             })->values();
             return $employee;
-        })->filter(function($user) {
+        })
+            ;
+
+        $result = $employees->filter(function($user) {
             if (count($user['visits']) > 0 ) {
                 return true;
             }
@@ -349,17 +352,21 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
             }
             return false;
         })->values();
+
+        if (count($result) < 1) {
+            $result = $employees;
+        }
     }
 
     $start = !empty($bids) ? substr(collect($bids)->first()['timeFrom'], 0, 5) : '9:00';
 
 
     echo json_encode([
-        'count' => count($employees),
+        'count' => count($result),
         'position' => $position,
-        'next' => empty($userID) && ($skip + $countMaster) < count($employees),
+        'next' => empty($userID) && ($skip + $countMaster) < count($result),
         'prev' => empty($userID) && $position !== 0,
-        'employees' => $employees,
+        'employees' => $result,
         'startTime' => $start,
         'utc' => [
             'regularFormat' => "1000",
