@@ -7,6 +7,8 @@ use Framework\Jwt;
 chdir(dirname(__DIR__));
 require 'vendor/autoload.php';
 
+error_reporting(0);
+
 $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
@@ -23,7 +25,7 @@ $uri = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 list($path, $params) = explode('?', $uri);
 
-if ($path === '/api/calendar-php' && $method === 'GET') {
+if ($path === '/api/crm/calendar-php' && $method === 'GET') {
     if (!$jwt->verifyToken()) {
         echo json_encode(['errors' =>
             [
@@ -48,6 +50,19 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
 
     $skip = $position * ($countMaster ?? 50);
 
+    $query = $conn->prepare('select * from model_has_roles WHERE `model_id` = ?');
+    $query->execute([$currentUserID]);
+    $role = $query->fetch();
+
+    $query = $conn->prepare('select * from permissions WHERE `name` in (?,?)');
+    $query->execute(['all-show-employees', 'all-show-bids']);
+    $permissions = $query->fetchAll();
+
+    $query = $conn->prepare('select * from role_has_permissions WHERE `role_id` = ? and `permission_id` in (?,?)');
+    $query->execute([$currentUserID, ...collect($permissions)->pluck('id')->toArray()]);
+    $isPermission = $query->fetchAll();
+
+
     if (empty($currentUser['phone'])) {
         $query = $conn->prepare('select `profiles`.*, `user_studio`.`userID` from `profiles` 
              inner join `user_studio` on `profiles`.`profileID` = `user_studio`.`profileID` where
@@ -65,6 +80,9 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
     $currentAddress = $query->fetch();
 
     if ($view === 'unit') {
+        if (empty($isPermission)) {
+            $userID = $currentUserID;
+        }
         $userSql = $userID ?  "`users`.`userID` = ? and"  : '';
         $select = "select users.userID,name,avatar,
         MIN(schedule_address_user.sort) AS sort,
@@ -77,15 +95,19 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
         $employees = $query->fetchAll();
         $employeesIds = collect($employees)->pluck('userID')->toArray();
 
-        $placeholders = implode(',', array_fill(0, count($employees), '?'));
-        $select = "select * from `bids` where `bids`.`masterID` in ($placeholders)
+        if ($employees) {
+            $placeholders = implode(',', array_fill(0, count($employees), '?'));
+            $select = "select * from `bids` where `bids`.`masterID` in ($placeholders) and date(`dateTime`) = ?
                        and exists (select * from `bids_visits` where
                       `bids`.`visitID` = `bids_visits`.`visitID` and `status` != ? and date(`date`) = ?
                        and `bids_visits`.`deleted_at` is null) and `bids`.`deleted_at` is null order by `timeFrom` asc";
 
-        $query = $conn->prepare($select);
-        $query->execute([...$employeesIds, 'cancel', $date]);
-        $bids = $query->fetchAll();
+            $query = $conn->prepare($select);
+            $query->execute([...$employeesIds, $date, 'cancel', $date]);
+            $bids = $query->fetchAll();
+        } else {
+            $bids = [];
+        }
 
         if ($bids) {
             $placeholders = implode(',', array_fill(0, count($bids), '?'));
@@ -97,6 +119,32 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
             $visits = $query->fetchAll();
         } else {
             $visits = [];
+        }
+
+        if ($bids) {
+            $dateTime = new DateTime($date); // For today/now, don't pass an arg.
+            $dateTime->modify("-8 day");
+            $sub10days = $dateTime->format("Y-m-d");
+
+            $placeholders = implode(',', array_fill(0, count($visits), '?'));
+            $visitIDs = collect($visits)->pluck('visitID')->toArray();
+
+            $select = "select `id`, `notification_id`, `statusText`, `status_text` as `text`, `created_at` as `createdAt` from
+`notifications` where `created_at` >= ? and `type` = ?  and `notification_type` = ? and `notifications`.`notification_id` in ($placeholders) order by `created_at` desc";
+
+            $query = $conn->prepare($select);
+            $query->execute([$sub10days, 'repeatReminder', 'Beauty\Modules\Common\Models\BidVisit', ...$visitIDs]);
+            $notificationRepeatReminder = $query->fetchAll();
+
+            $select = "select `id`, `notification_id`, `statusText`, `status_text` as `text`, `created_at` as `createdAt` from
+`notifications` where `created_at` >= ? and `type` = ?  and `notification_type` = ? and `notifications`.`notification_id` in ($placeholders) order by `created_at` desc";
+
+            $query = $conn->prepare($select);
+            $query->execute([$sub10days, 'reminder', 'Beauty\Modules\Common\Models\BidVisit', ...$visitIDs]);
+            $notificationReminder = $query->fetchAll();
+        } else {
+            $notificationRepeatReminder = [];
+            $notificationReminder = [];
         }
 
 
@@ -142,6 +190,19 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
             $blockingTimes = [];
         }
 
+        if ($blockingTimes) {
+            $placeholders = implode(',', array_fill(0, count($blockingTimes), '?'));
+            $colorIDs = collect($blockingTimes)->pluck('colorID')->toArray();
+            $select = "select * from `colors` where `colors`.`colorID` in ($placeholders)";
+
+            $query = $conn->prepare($select);
+            $query->execute([...$colorIDs]);
+            $colors = $query->fetchAll();
+        } else {
+            $colors = [];
+        }
+
+
         if ($visits) {
             $placeholders = implode(',', array_fill(0, count($visits), '?'));
             $clientIDs = collect($visits)->pluck('clientID')->toArray();
@@ -169,7 +230,7 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
         if ($bids) {
             $placeholders = implode(',', array_fill(0, count($bids), '?'));
             $mastersIDs = collect($bids)->pluck('masterID')->toArray();
-            $select = "select `userID`, `associatePhone` as `phone`, `name` from `users` where `users`.`userID` in ($placeholders)";
+            $select = "select `userID`, `associatePhone` as `phone`, `name`, `avatar` from `users` where `users`.`userID` in ($placeholders)";
 
             $query = $conn->prepare($select);
             $query->execute([...$mastersIDs]);
@@ -178,12 +239,11 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
             $masters = [];
         }
 
-
-        $employees = collect($employees)->map(function($employee) use ($bids, $visits, $positions, $services, $masters, $schedules, $blockingTimes, $clients) {
+        $employees = collect($employees)->map(function ($employee) use ($bids, $visits, $positions, $services, $masters, $schedules, $blockingTimes, $clients, $colors, $notificationRepeatReminder, $notificationReminder) {
             if (!empty($employee['avatar'])) {
                 list($name, $extention) = explode('.', $employee['avatar']);
                 $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
-                $employee['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/'. substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.' . $extention;
+                $employee['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/' . substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.' . $extention;
             }
             $positionName = collect($positions)->where('userID', $employee['userID'])->first() ?? null;
             $employee['positionName'] = $positionName['name'] ?? null;
@@ -205,8 +265,19 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
 
             $blockingTimes = collect($blockingTimes)->where('userID', $employee['userID']) ?? [];
 
-            $blockingTimes = $blockingTimes->map(function($block){
+            $blockingTimes = $blockingTimes->map(function ($block) use ($masters, $colors) {
                 $block['onlineIsBlocked'] = (bool) $block['onlineIsBlocked'];
+                $color = collect($colors)->where('colorID', $block['colorID'])->first() ?? null;
+                $block['color'] = $color['color'];
+                $users = collect($masters)->where('userID', $block['userID'])->map(function ($user) {
+                    if (!empty($user['avatar'])) {
+                        list($name, $extention) = explode('.', $user['avatar']);
+                        $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
+                        $user['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/' . substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.' . $extention;
+                    }
+                    return $user;
+                }) ?? [];
+                $block['users'] = $users->values();
                 $block['blockOnAllDay'] = $block['timeFrom'] === '00:00:00' &&
                     $block['timeTo'] >= '23:45:00';
 
@@ -216,7 +287,7 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
 
             $employee['blockingTime'] = $blockingTimes;
 
-            $masterBids = collect($bids)->where('masterID', $employee['userID'])->map(function($bid) use ($services, $masters) {
+            $masterBids = collect($bids)->where('masterID', $employee['userID'])->map(function ($bid) use ($services, $masters) {
                 if ($bid['timeFrom']) {
                     $bid['timeFrom'] = substr($bid['timeFrom'], 0, 5);
                 }
@@ -233,25 +304,28 @@ if ($path === '/api/calendar-php' && $method === 'GET') {
                 return $bid;
             })
                 ->groupBy('visitID');
-            $employee['visits'] = collect($visits)->filter(function($visit) use ($masterBids){
+            $employee['visits'] = collect($visits)->filter(function ($visit) use ($masterBids) {
                 return in_array($visit['visitID'], $masterBids->keys()->toArray());
-            })->map(function($visit) use ($masterBids, $clients) {
+            })->map(function ($visit) use ($masterBids, $clients, $notificationRepeatReminder, $notificationReminder) {
                 $bids = $masterBids[$visit['visitID']];
                 $client = collect($clients)->where('clientID', $visit['clientID'])->first() ?? null;
                 $visit['client'] = $client;
                 $visit['isOnline'] = (bool) $visit['isOnline'];
                 $visit['timeStart'] = $bids->first()['timeFrom'];
                 $visit['bids'] = $bids;
-                $visit['notification'] = ["notificationRepeatReminder" => null, "notificationReminder" => null];
+                $repeatReminder = collect($notificationRepeatReminder)->where('notification_id', $visit['visitID'])->first() ?? null;
+                $reminder = collect($notificationReminder)->where('notification_id', $visit['visitID'])->first() ?? null;
+                $visit['notification'] = [
+                    "notificationRepeatReminder" => $repeatReminder,
+                    "notificationReminder" => $reminder
+                ];
                 return $visit;
             })->values();
             return $employee;
         });
-
-
     }
 
-    $start = !empty($bids) ? substr(collect($bids)->first()['timeFrom'],0, 5) : '9:00';
+    $start = !empty($bids) ? substr(collect($bids)->first()['timeFrom'], 0, 5) : '9:00';
 
 
     echo json_encode([

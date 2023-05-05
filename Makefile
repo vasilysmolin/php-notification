@@ -11,6 +11,9 @@ install:
 lint:
 	composer lint
 
+lint-fix:
+	composer exec phpcbf -v
+
 build-php:
 	docker build -t kitman/php-native:$(branch) -f ./images/php/Dockerfile .
 	docker push kitman/php-native:$(branch)

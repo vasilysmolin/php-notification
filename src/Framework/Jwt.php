@@ -14,12 +14,11 @@ class Jwt
         $dotenv = Dotenv::createImmutable(__DIR__ . '/../..');
         $dotenv->load();
         if ($bearer) {
-            $token = explode('Bearer ', $bearer);
-            if (isset($token[1])) {
-                $this->token = $token[1];
+            $token = substr($bearer, 7);
+            if (isset($token)) {
+                $this->token = $token;
             }
         }
-
     }
 
 //    function createToken($userId, $secret) {
@@ -36,7 +35,8 @@ class Jwt
 //    }
 
 
-    public function verifyToken(): bool {
+    public function verifyToken(): bool
+    {
 
         list($header, $payload, $signature) = explode('.', $this->token);
         $valid = hash_hmac('sha256', "$header.$payload", $_ENV['JWT_SECRET'], true);
@@ -46,14 +46,14 @@ class Jwt
 //        echo substr($valid,0,-1);
         $valid = str_replace('/', '_', $valid);
         $valid = str_replace('+', '-', $valid);
-        return $signature === substr($valid,0,-1);
+        return $signature === substr($valid, 0, -1);
     }
 
-    public function getUserID(): int {
+    public function getUserID(): int
+    {
 
         list($header, $payload, $signature) = explode('.', $this->token);
         $payload = json_decode(base64_decode($payload), true);
         return $payload['userID'];
     }
-
 }
