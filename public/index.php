@@ -342,8 +342,8 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
         })
             ;
 
-        $result = $employees->filter(function($user) {
-            if (count($user['visits']) > 0 ) {
+        $result = $employees->filter(function ($user) {
+            if (count($user['visits']) > 0) {
                 return true;
             }
             if (count($user['schedules']) > 0) {
