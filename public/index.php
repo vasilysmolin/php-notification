@@ -59,7 +59,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
     $permissions = $query->fetchAll();
 
     $query = $conn->prepare('select * from role_has_permissions WHERE `role_id` = ? and `permission_id` in (?,?)');
-    $query->execute([$currentUserID, ...collect($permissions)->pluck('id')->toArray()]);
+    $query->execute([$role['role_id'], ...collect($permissions)->pluck('id')->toArray()]);
     $isPermission = $query->fetchAll();
 
 
@@ -78,6 +78,8 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
     $query = $conn->prepare('select addressID from addresses WHERE `profileID` = ? and `addresses`.`deleted_at` is null');
     $query->execute([$currentProfile['profileID']]);
     $currentAddress = $query->fetch();
+
+
 
     if ($view === 'unit') {
         if (empty($isPermission)) {
