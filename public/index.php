@@ -204,6 +204,23 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
             $colors = [];
         }
 
+        if ($blockingTimes) {
+            $placeholders = implode(',', array_fill(0, count($blockingTimes), '?'));
+            $blockTimeIDs = collect($blockingTimes)->pluck('blockTimeID')->toArray();
+            $select = "select `users`.userID, `users`.name, `users`.avatar, `users_blocking_times`.`blockTimeID`,
+            `users_blocking_times`.`userID` from `users` inner join `users_blocking_times` on `users`.`userID` =
+            `users_blocking_times`.`userID` where `users_blocking_times`.`blockTimeID` in ($placeholders) and `users`.`deleted_at` is null";
+
+            $query = $conn->prepare($select);
+            $query->execute([...$blockTimeIDs]);
+            $blockTimeUsers = $query->fetchAll();
+        } else {
+            $blockTimeUsers = [];
+        }
+
+//        var_dump($blockTimeUsers);
+//        exit;
+
 
         if ($visits) {
             $placeholders = implode(',', array_fill(0, count($visits), '?'));
@@ -241,7 +258,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
             $masters = [];
         }
 
-        $employees = collect($employees)->map(function ($employee) use ($bids, $visits, $positions, $services, $masters, $schedules, $blockingTimes, $clients, $colors, $notificationRepeatReminder, $notificationReminder) {
+        $employees = collect($employees)->map(function ($employee) use ($bids, $visits, $positions, $services, $masters, $schedules, $blockingTimes, $clients, $colors, $notificationRepeatReminder, $notificationReminder, $blockTimeUsers) {
             if (!empty($employee['avatar'])) {
                 list($name, $extention) = explode('.', $employee['avatar']);
                 $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
@@ -265,9 +282,17 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
             }
             $employee['schedules'] = $schedule ? [$schedule] : [];
 
-            $blockingTimes = collect($blockingTimes)->where('userID', $employee['userID']) ?? [];
+            $newBlockTimes = collect($blockingTimes)->map(function($block) use ($blockTimeUsers) {
+                $block['userIDs'] = collect($blockTimeUsers)->where('blockTimeID', $block['blockTimeID'])->pluck('userID')->toArray() ?? [];
+                $block['users'] = collect($blockTimeUsers)->where('blockTimeID', $block['blockTimeID'])->toArray() ?? [];
+                return $block;
+            });
 
-            $blockingTimes = $blockingTimes->map(function ($block) use ($masters, $colors) {
+            $filterBlockingTimes = collect($newBlockTimes)->filter(function($collection) use ($employee){
+                return in_array($employee['userID'], $collection['userIDs']);
+            });
+
+            $userBlockingTimes = $filterBlockingTimes->unique('blockTimeID')->map(function ($block) use ($masters, $colors, $blockTimeUsers) {
                 $block['onlineIsBlocked'] = (bool) $block['onlineIsBlocked'];
                 unset($block['created_at']);
                 unset($block['pivot_userID']);
@@ -276,8 +301,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
                 $color = collect($colors)->where('colorID', $block['colorID'])->first() ?? null;
                 unset($block['colorID']);
                 $block['color'] = $color['color'];
-                $users = collect($masters)->where('userID', $block['userID'])->map(function ($user) {
-                    unset($user['phone']);
+                $users = collect($block['users'])->where('blockTimeID', $block['blockTimeID'])->map(function ($user) {
                     if (!empty($user['avatar'])) {
                         list($name, $extention) = explode('.', $user['avatar']);
                         $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
@@ -293,7 +317,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
             })->values();
 
 
-            $employee['blockingTime'] = $blockingTimes;
+            $employee['blockingTime'] = $userBlockingTimes;
 
             $masterBids = collect($bids)->where('masterID', $employee['userID'])->map(function ($bid) use ($services, $masters) {
                 if ($bid['timeFrom']) {
@@ -339,8 +363,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
                 return $visit;
             })->values();
             return $employee;
-        })
-            ;
+        });
 
         $result = $employees->filter(function ($user) {
             if (count($user['visits']) > 0) {
