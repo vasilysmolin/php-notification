@@ -262,7 +262,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
             if (!empty($employee['avatar'])) {
                 list($name, $extention) = explode('.', $employee['avatar']);
                 $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
-                $employee['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/' . substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.' . $extention;
+                $employee['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/' . substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.jpg';
             }
             $positionName = collect($positions)->where('userID', $employee['userID'])->first() ?? null;
             $employee['positionName'] = $positionName['name'] ?? null;
@@ -305,7 +305,7 @@ if ($path === '/api/crm/calendar' && $method === 'GET') {
                     if (!empty($user['avatar'])) {
                         list($name, $extention) = explode('.', $user['avatar']);
                         $bucket = $_ENV['APP_ENV'] === 'production' ?  'bb-avatar' : 'bb-avatar-dev';
-                        $user['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/' . substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.' . $extention;
+                        $user['avatar'] = "https://$bucket.storage.yandexcloud.net/users/" . substr($name, 0, 2) . '/' . substr($name, 2, 2) . '/' . $name . '/' . $name . '_120x120.jpg';
                     }
                     return $user;
                 }) ?? [];
